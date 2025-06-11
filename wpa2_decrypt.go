@@ -24,17 +24,16 @@ func main() {
 
 	pcap := "capture.pcap"
 	// Start tcpdump to capture EAPOL frames and all traffic
-	cmd := exec.Command("tcpdump", "-i", iface, "-w", pcap, "ether proto 0x888e or type Data")
+	cmd := exec.Command("tcpdump", "-i", iface, "-w", pcap)
 	stderr, _ := cmd.StderrPipe()
-	stdout, _ := cmd.StdoutPipe()
 	if err := cmd.Start(); err != nil {
-		fmt.Println("Failed to start tcpdump:", err)
+		fmt.Println("Failed to start tcpdump:", err, stderr)
 		os.Exit(1)
 	}
 	fmt.Println("Capturing traffic. Waiting for EAPOL handshake...")
 
 	// Start another tcpdump to print packets for EAPOL detection
-	cmd2 := exec.Command("tcpdump", "-i", iface, "ether proto 0x888e", "-l")
+	cmd2 := exec.Command("tcpdump", "-i", iface, "ether proto 0x888e")
 	pipe, _ := cmd2.StdoutPipe()
 	if err := cmd2.Start(); err != nil {
 		fmt.Println("Failed to start tcpdump for EAPOL detection:", err)
@@ -43,14 +42,12 @@ func main() {
 	}
 
 	// Scan output for EAPOL
-	found := false
 	go func() {
 		scanner := bufio.NewScanner(pipe)
 		for scanner.Scan() {
 			line := scanner.Text()
 			if strings.Contains(line, "EAPOL") {
 				fmt.Println("EAPOL handshake detected!")
-				found = true
 				return
 			}
 		}
@@ -65,20 +62,12 @@ func main() {
 	cmd2.Process.Kill()
 	fmt.Println("Capture stopped. Decrypting...")
 
-	// aircrack-ng -w <wordlist> -e <ssid> <pcap>
-	// We'll create a temporary wordlist file with the passphrase
-	wordlist := "wordlist.txt"
-	if err := os.WriteFile(wordlist, []byte(pass+"\n"), 0600); err != nil {
-		fmt.Println("Failed to write wordlist:", err)
+	airdecap := exec.Command("airdecap-ng", "-e", ssid, "-p", pass, pcap)
+	airdecap.Stdout = os.Stdout
+	airdecap.Stderr = os.Stderr
+	if err := airdecap.Run(); err != nil {
+		fmt.Println("airdecap-ng failed:", err)
 		os.Exit(1)
 	}
-	defer os.Remove(wordlist)
-
-	aircrack := exec.Command("aircrack-ng", "-w", wordlist, "-e", ssid, pcap)
-	aircrack.Stdout = os.Stdout
-	aircrack.Stderr = os.Stderr
-	if err := aircrack.Run(); err != nil {
-		fmt.Println("aircrack-ng failed:", err)
-		os.Exit(1)
-	}
+	fmt.Println("Decryption completed.")
 }
