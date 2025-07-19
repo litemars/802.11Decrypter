@@ -86,14 +86,14 @@ func setChannel(iface string, channel string) error {
 	return nil
 }
 
- func runAirmon(iface string) error {
-	// fmt.Println("Running airmon-ng to start monitor mode on", iface)	
- 	cmd := exec.Command("sudo", "airmon-ng","start",iface)
- 	if output, err := cmd.Output(); err != nil {
- 		return fmt.Errorf("failure %v - %s", err,output)
- 	}
- 	return nil
- }
+func runAirmon(iface string) error {
+	// fmt.Println("Running airmon-ng to start monitor mode on", iface)
+	cmd := exec.Command("sudo", "airmon-ng", "start", iface)
+	if output, err := cmd.Output(); err != nil {
+		return fmt.Errorf("failure %v - %s", err, output)
+	}
+	return nil
+}
 
 func captureTraffic(iface string, pcap string, mac string) (*exec.Cmd, error) {
 	cmd := exec.Command("tcpdump", "-i", iface, "-U", "-s", "0", "-w", pcap, "ether host", mac)
@@ -144,7 +144,6 @@ func ProcessMAC(iface, channel, ssid, pass, mac string) error {
 		return fmt.Errorf("error running airmon %v", err)
 	}
 
-
 	if err := setMonitorMode(iface); err != nil {
 		return fmt.Errorf("error setting monitor mode for %s: %v", mac, err)
 	}
@@ -153,11 +152,10 @@ func ProcessMAC(iface, channel, ssid, pass, mac string) error {
 		return fmt.Errorf("error setting channel for %s: %v", mac, err)
 	}
 
-
 	timestamp := time.Now().Format("20060102_150405")
 
 	pcap := fmt.Sprintf("capture/capture_%s_%s.pcap", mac, timestamp)
-	
+
 	captureCmd, err := captureTraffic(iface, pcap, mac)
 	if err != nil {
 		return err
@@ -170,7 +168,7 @@ func ProcessMAC(iface, channel, ssid, pass, mac string) error {
 	}
 
 	<-done // Wait for EAPOL detection
-	waitOrEnter(10 * time.Minute) 
+	waitOrEnter(60 * 4 * time.Minute)
 	captureCmd.Process.Kill()
 	fmt.Printf("[%s] Capture stopped. Decrypting...\n", mac)
 
